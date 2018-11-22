@@ -1,11 +1,15 @@
 import random
 import numpy as np
 import itertools as it
+import colorama
 from collections import Counter
+from card import *
+from utils import *
 
 allvalues = list(range(6,15))
-allfaces = ['6','7','8','9','T','J','Q','K','A']
 allsuits = ['C','D','H','S']
+allfaces = ['6','7','8','9','T','J','Q','K','A']
+
 msuit = None
 
 # class Game():
@@ -40,7 +44,7 @@ class Card():
 
     def __str__(self):
         face = allfaces[self.value - 6]
-        return face + self.suit
+        return colorama.Fore.GREEN + face + self.suit + colorama.Fore.RESET
 
     def __repr__(self):
         return str(self)
@@ -99,21 +103,25 @@ class Deck():
     def __str__(self):
         return str(self.cards)
 
+    def __repr__(self):
+        return str(self)
+
     def draw(self):
         return self.cards.pop()
 
 
 
-def dump_func(func):
-    def echo_func(*func_args, **func_kwargs):
-        if func_kwargs:
-            print('{}({},{})'.format(func.__name__,func_args,func_kwargs))
-        else:
-            print('{}({})'.format(func.__name__,func_args))
+# def dump_func(func):
+#     def echo_func(*func_args, **func_kwargs):
+#         if func_kwargs:
+#             print('{}({},{})'.format(func.__name__,func_args,func_kwargs))
+#         else:
+#             print('{}({})'.format(func.__name__,func_args))
 
-        return func(*func_args, **func_kwargs)
-    return echo_func
+#         return func(*func_args, **func_kwargs)
+#     return echo_func
 
+@decorate_class_functions(debug_func)
 class Player():
     playernum = 0
     def __init__(self,deck):
@@ -128,7 +136,19 @@ class Player():
     def __repr__(self):
         return str(self)
 
-    @dump_func
+    def draw_cards(self,deck):
+        num_to_draw = 6 - len(self.hand)
+        if num_to_draw > 0:
+            try:
+                for _ in range(num_to_draw):
+                    self.hand.append(deck.draw())
+                return False
+            except:
+                return True
+        else:
+            return False
+
+
     def initial_attack(self,defender):
 
         # check if we have two or more of the same card. If so, just play those two.those
@@ -143,9 +163,8 @@ class Player():
             self.place_attack_cards_down([card],defender)
             return 1
 
-    @dump_func
     def addon_attack(self,defender):
-        yardfaces = set(card.value for card in it.chain.from_iterable(defender.yard.items()))
+        yardfaces = set(card.value for card in it.chain.from_iterable(defender.yard.items()) if card is not None)
         handfaces = set(card.value for card in self.hand)
         playablefaces = handfaces.intersection(yardfaces)
         playcardlimit = len(defender.hand)
@@ -154,16 +173,25 @@ class Player():
         num = len(candidates) if len(candidates) < playcardlimit else playcardlimit
         options = list(it.combinations(candidates,num))
 
-        option = random.choice(options)
-        self.place_attack_cards_down(option,defender)
+        if len(options) == 0:
+            return 0
+        else:
+            option = random.choice(options)
+            self.place_attack_cards_down(option,defender)
+            return len(option)
 
-    @dump_func
     def place_attack_cards_down(self,cards,defender):
         for card in cards:
             self.hand.remove(card)
             defender.yard[card] = None
 
-    @dump_func
+
+    def place_defending_cards_down(self,option):
+        cardstobeat = [card for card,beatcard in self.yard.items()if beatcard is None]
+        for cardtobeat,beatingcard in zip(cardstobeat,option):
+            self.yard[cardtobeat] = beatingcard
+            self.hand.remove(beatingcard)
+
     def take_cards(self):
         for card,beatcard in self.yard.items():
             self.hand.append(card)
@@ -173,7 +201,12 @@ class Player():
         self.yard = {}
 
 
-    @dump_func
+    def transfer_to_bita(self,deck):
+        for card in it.chain.from_iterable(self.yard.items()):
+            deck.bitapile.append(card)
+        self.yard = {}
+
+
     def choose_option(self,options):
         option = min(
             options,
@@ -181,9 +214,7 @@ class Player():
         )
         return option
 
-    @dump_func
-    def defend(self):
-
+    def generate_playable_options(self):
         candidates = {card:[] for card,beatcard in self.yard.items() if beatcard is None}
 
         for card1 in candidates:
@@ -194,18 +225,29 @@ class Player():
 
         options = [s for s in (it.product(*candidates.values())) if len(set(s)) == len(s)]
 
-
-        option = self.choose_option(options)
-
+        return options
 
 
-        # if we choose to take
-        if option == False:
+
+
+    def defend(self):
+
+
+        options = self.generate_playable_options()
+
+        # if there are no options of how to beat, then you must take
+        if len(options) == 0:
+            self.take_cards()
             return False
 
-        for cardtobeat,beatingcard in zip(candidates.keys(),option):
-            self.yard[cardtobeat] = beatingcard
-            self.hand.remove(beatingcard)
+        option = self.choose_option(options)
+        
+        # if the best option (despite there being a playable card) is to take
+        if option == False:
+            self.take_cards()
+            return False
+
+        self.place_defending_cards_down(option)
 
         return True
 
@@ -217,6 +259,22 @@ class Player():
 
 
 
+
+def check_winner(player):
+    global turn
+    global game_over
+    if len(player.hand) == 0 and len(deck.cards) == 0:
+        winners.append(player)
+        print("{} is the {} place winner.".format(player,placestr(len(winners))))
+        players.remove(player)
+        turn -= 1
+
+        if len(players) == 1:
+            game_over = True
+
+        return True
+    else:
+        return False
 
 
         
@@ -233,63 +291,113 @@ class Player():
 #   Perfect knowledge of what has been played/who took what
 #   Probabilities for different cards
 
+randomseed = random.randint(0,100)
+print(randomseed)
+# random.seed(62)
 
 
 deck = Deck()
 players = [Player(deck) for _ in range(3)]
 
-force_hands = [
-    ["QH", "8C", "6H", "8H", "7C", "8S"], 
-    ["TD", "9S", "AH", "QC", "KS", "KC"], 
-    ["JS", "9H", "AS", "TC", "7H", "8D"]
-]
+# force_hands = [
+#     ["QH", "8C", "6H", "8H", "7C", "8S"], 
+#     ["TD", "9S", "AH", "QC", "KS", "KC"], 
+#     ["JS", "9H", "AS", "TC", "7H", "8D"]
+# ]
 
-for player,hand in zip(players,force_hands):
-    player.hand = [Card(string=card) for card in hand]
+# for player,hand in zip(players,force_hands):
+#     player.hand = [Card(string=card) for card in hand]
 
-msuit = "H"
+# msuit = "H"
 
 
 print("Master Suit: {}".format(msuit))
+for player in players:
+    print("{}: {}".format(player,player.hand)) 
+print('\n\n') 
 
 
+
+
+
+#set up the round
+game_over = False
 turn = 0
-attacker = players[turn]
-defender = players[(turn+1) % len(players)]
-
-limit = len(defender.hand)
-limit -= attacker.initial_attack(defender)
-
-
-
+current_round = 0
+skipped = False
+deck_empty = False
+winners = []
 
 while(True):
-
-    bita=True
-    skipped = False
-
-
-    defended = defender.defend()
-    if (not defended):
-        skipped = True
-        defender.take_cards()
+    if game_over:
+        print("Winners: {}".format(winners))
+        print("Durak: {}".format(players[0]))
         break
+    print("\n\n\n==== ROUND {} ====".format(current_round))
+
+    for player in players:
+        print("{}: {}".format(player,player.hand))
+
+    if skipped:
+        turn += 1
+
+    attacker = players[turn % len(players)]
+    defender = players[(turn+1) % len(players)]
+
+    turn += 1
+    current_round += 1
+
+    print("attacker: {}, defender: {}".format(attacker,defender))
+
+    attacker.initial_attack(defender)
+    check_winner(attacker)
 
 
+    for player in players:
+        if player == defender:
+            continue
+        numcards = player.addon_attack(defender)
+        check_winner(player)
+        if numcards:
+            morecards = True
 
-    else:
-        morecards = False
-        for player in players:
-            if player != defender:
-                numcards = player.addon_attack(defender)
-                if numcards:
-                    morecards = True
-                    limit -= numcards
+    while(True):
+        print("{}: {}".format(cstr("Defender's yard","BLUE"),defender.yard))
 
-        if not morecards:
+        bita=False
+        skipped = False
+
+        defended = defender.defend()
+        defender_won = check_winner(defender)
+
+        if defender_won:
+            defender.transfer_to_bita(deck)
             bita = True
+            break
+
+        if (not defended):
+            skipped = True
+            break
+
+        else:
+            morecards = False
+            for player in players:
+                if player != defender:
+                    numcards = player.addon_attack(defender)
+                    check_winner(player)
+                    if numcards:
+                        morecards = True
+
+            if not morecards:
+                bita = True
 
 
-    if (bita):
-        break
+        if (bita):
+            defender.transfer_to_bita(deck)
+            break
+
+    for player in players:
+        deck_empty = player.draw_cards(deck)
+
+
 
