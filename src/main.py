@@ -293,30 +293,16 @@ def check_winner(player):
 
 randomseed = random.randint(0,100)
 print(randomseed)
-# random.seed(62)
 
 
 deck = Deck()
-players = [Player(deck) for _ in range(3)]
-
-# force_hands = [
-#     ["QH", "8C", "6H", "8H", "7C", "8S"], 
-#     ["TD", "9S", "AH", "QC", "KS", "KC"], 
-#     ["JS", "9H", "AS", "TC", "7H", "8D"]
-# ]
-
-# for player,hand in zip(players,force_hands):
-#     player.hand = [Card(string=card) for card in hand]
-
-# msuit = "H"
+players = [Player(deck) for _ in range(4)]
 
 
 print("Master Suit: {}".format(msuit))
 for player in players:
     print("{}: {}".format(player,player.hand)) 
 print('\n\n') 
-
-
 
 
 
@@ -401,3 +387,19 @@ while(True):
 
 
 
+"""
+In order to be able to capture more accurately the real-time element of the original card game,
+consider using a different event loop model.
+
+Separate the rule enforcement from the choice making.choice
+
+Divide sequence of events into timeticks (atomic) with random (aware) but fair choosing for who
+acts on first impulse. For example, this scenario: 
+
+4 Players. Attacker plays a 6. Defender only has 2 cards left.
+Both of the other two players also have a 6. In a real game, the player
+with the faster reflexes gets to put their card down. Machines obviously don't have
+these reflexes. So break the "tie" randomly, but fairly.
+
+During a timetick a given player can play 
+"""
