@@ -109,17 +109,7 @@ class Deck():
     def draw(self):
         return self.cards.pop()
 
-
-
-# def dump_func(func):
-#     def echo_func(*func_args, **func_kwargs):
-#         if func_kwargs:
-#             print('{}({},{})'.format(func.__name__,func_args,func_kwargs))
-#         else:
-#             print('{}({})'.format(func.__name__,func_args))
-
-#         return func(*func_args, **func_kwargs)
-#     return echo_func
+ 
 
 @decorate_class_functions(debug_func)
 class Player():
@@ -385,7 +375,12 @@ while(True):
     for player in players:
         deck_empty = player.draw_cards(deck)
 
-
+"""
+After every atomic card information event, every player should have equal opportunity to react. 
+After every event, poll every player for an action. Break ties randomly, and choose who goes randomly. 
+After whatever player is chosen, perform their action, and then poll everyone again. Do not cache poll
+results, because each action may invalidate previous decisions by the computer players.
+"""
 
 """
 In order to be able to capture more accurately the real-time element of the original card game,
